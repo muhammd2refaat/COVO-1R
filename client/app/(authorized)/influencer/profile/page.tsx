@@ -16,8 +16,6 @@ import { getCampaignInvitationsRoute } from "@/lib/api/campaign/get-invitations/
 import ShadcnTitle from "@/components/shared/page-title/PageTitle.component";
 import { useRouter } from "next/navigation";
 import ProfileCampaignSection from "@/components/shared/campaign-section/ProfileCampaignSection.component";
-import ViewInvitationsDialog from "@/components/authorized/influencer/profile/invitations/ViewInvitationsDialog.component";
-import { CovoScoreDisplay } from "@/components/shared/covo-score-display/CovoScoreDisplay.component";
 
 // Function to calculate age from year of birth
 const calculateAge = (yearOfBirth: string): number | null => {
@@ -31,7 +29,6 @@ export default function ProfilePage() {
   const profile = useAppSelector((state) => state.profile);
   const [isLoading, setIsLoading] = useState(false);
   const [appliedCampaigns, setAppliedCampaigns] = useState([]);
-  const [receivedInvitations, setReceivedInvitations] = useState([]); // New state for invitations
   const { data: session, update } = useSession();
   const [error, setError] = useState<string | null>(null);
   const token = session?.user?.access_token;
@@ -114,16 +111,10 @@ export default function ProfilePage() {
           ); // Pass page and limit
           console.log(result)
           if (result.status === "success") {
-            setAppliedCampaigns(result.data.data || []);
+            setAppliedCampaigns(result.data.data);
           } else {
-            // Handle "no campaigns found" as a normal case, not an error
-            if (result.message?.includes("No campaigns found")) {
-              setAppliedCampaigns([]);
-              console.log("ℹ️ No registered campaigns found for this influencer");
-            } else {
-              setError(result.message || "Failed to fetch data.");
-              console.error("API Error:", result);
-            }
+            setError(result.message || "Failed to fetch data.");
+            console.error("API Error:", result);
           }
         } catch (err: any) {
           setError(err.message || "An error occurred.");
@@ -169,11 +160,9 @@ export default function ProfilePage() {
               className=" w-full h-full rounded-lg"
             />
             <div className="flex justify-between items-center  gap-4">
-              <CovoScoreDisplay
-                className="text-white z-10"
-                size="md"
-                showLabel={true}
-              />
+              <p className="text-lg w-[160px] text-center border-2 rounded-md text-white p-2 font-weight-[800] z-10 border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.3)] backdrop-blur-sm">
+                Covo Score: 8.20
+              </p>
               <UpdateProfile />
             </div>
           </div>
