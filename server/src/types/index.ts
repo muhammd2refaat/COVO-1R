@@ -59,7 +59,6 @@ export interface IInfluencer extends IUser {
 		city: string;
 	};
 	gender: string;
-	referralCode?: string;
 	payoutPreference: "direct_bank" | "wallet";
 	referralSource?: string;
 }
@@ -532,24 +531,25 @@ export interface IYoutubeMetrics {
 
 export interface IFacebookMetrics {
     // influencerId: mongoose.Types.ObjectId;
-	metrics: {
-		followers: number;
-		impressions: number;
-		engagementRate: number;
-		likes: number;
-		views: number;
-		comments: number;
-		shares: number;
-		reach: number;
-		lastUpdated: Date;
-	};
+    influencerId: string;
 
-	accessToken: string;
-	refreshToken?: string;
-	pageAccessToken: string;
-	tokenExpiry: Date;
-	connected: boolean;
-	lastConnected: Date;
+    metrics: {
+        followers: number;
+        impressions: number;
+        engagementRate: number;
+        likes: number;
+        views: number;
+        comments: number;
+        shares: number;
+        reach: number;
+        lastUpdated: Date;
+    };
+
+    accessToken: string;
+    refreshToken?: string;
+    tokenExpiry: Date;
+    connected: boolean;
+    lastConnected: Date;
 	facebookId?: string;
 
 	demographics?: {
