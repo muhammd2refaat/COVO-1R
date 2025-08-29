@@ -2,7 +2,6 @@ import { Campaign } from "../models/campaign.models";
 import {
   ICampaign,
   IInfluencer,
-  IInvitation,
   IRecommendedInfluencer,
   SearchResponse,
   ServiceResponse,
@@ -19,15 +18,15 @@ import { isValidObjectId } from "../utils/valid";
 import { CampaignValidationSchema } from "../schema/auth.schema";
 import { ZodSchema } from "zod";
 import { Influencer } from "../models/influencers.models";
-import { Invitation } from "../models/invitation.models";
 
 export class CampaignProvider {
+
   private isFollowerCountValidForType(followers: number): string {
-    if (followers >= 1000 && followers < 10000) return "Nano";
-    if (followers >= 10000 && followers < 100000) return "Micro";
-    if (followers >= 100000 && followers < 1000000) return "Macro";
-    if (followers >= 1000000) return "Mega";
-    return "Unknown";
+    if (followers >= 1000 && followers < 10000) return 'Nano';
+    if (followers >= 10000 && followers < 100000) return 'Micro';
+    if (followers >= 100000 && followers < 1000000) return 'Macro';
+    if (followers >= 1000000) return 'Mega';
+    return 'Unknown';
   }
 
   /**
@@ -167,10 +166,7 @@ export class CampaignProvider {
 
       const skip = (page - 1) * limit;
 
-      const campaigns = await Campaign.find({
-        brandId: brandId,
-        status: "active",
-      })
+      const campaigns = await Campaign.find({ brandId: brandId, status: "active" })
         .populate({
           path: "brandId",
           select: "firstName lastName -role",
@@ -198,11 +194,7 @@ export class CampaignProvider {
         },
       };
     } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof BadRequest ||
-        error instanceof InvalidInput
-      ) {
+      if (error instanceof ResourceNotFound || error instanceof BadRequest || error instanceof InvalidInput) {
         throw error;
       }
       throw new Error(`Error retrieving campaigns: ${error.message}`);
@@ -259,11 +251,7 @@ export class CampaignProvider {
         data: campaign,
       };
     } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof BadRequest ||
-        error instanceof InvalidInput
-      ) {
+      if (error instanceof ResourceNotFound || error instanceof BadRequest || error instanceof InvalidInput) {
         throw error;
       }
       throw new Error(`Error retrieving campaign: ${error.message}`);
@@ -282,41 +270,41 @@ export class CampaignProvider {
   public async rejectInfluencerForCampaign(
     brandId: string,
     campaignId: string,
-    influencerId: string
-  ): Promise<ServiceResponse<IInvitation>> {
+    payload: Partial<ICampaign>
+  ): Promise<ServiceResponse<ICampaign>> {
     try {
-      if (!isValidObjectId(brandId)) throw new BadRequest("Invalid brand ID");
-      if (!isValidObjectId(campaignId))
+      if (!isValidObjectId(brandId.toString()))
+        throw new BadRequest("Invalid brand ID");
+      if (!isValidObjectId(campaignId.toString()))
         throw new BadRequest("Invalid campaign ID");
-      if (!isValidObjectId(influencerId))
-        throw new BadRequest("Invalid influencer ID");
 
-      const invitation = await Invitation.findOneAndUpdate(
-        { campaignId, influencerId, brandId },
-        { status: "rejected" },
+      console.log(...payload.influencerId, "acceptInfluencer");
+      const campaign = await Campaign.findOneAndUpdate(
+        { _id: campaignId, brandId: brandId },
+        {
+          $pull: {
+            applications: {
+              influencerId: { $in: payload.influencerId!.map(id => new mongoose.Types.ObjectId(id)) }
+            }
+          }
+        },
         { new: true }
-      );
+      ).populate("brandId influencerId");
 
-      if (!invitation) {
-        throw new ResourceNotFound(
-          "Application/invitation not found for this influencer and campaign."
-        );
+      if (!campaign) {
+        throw new ResourceNotFound("Campaign not found for this brand");
       }
 
       return {
         status_code: 200,
-        message: "Influencer application rejected successfully",
-        data: invitation,
+        message: "Campaign updated successfully",
+        data: campaign,
       };
     } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof BadRequest ||
-        error instanceof InvalidInput
-      ) {
+      if (error instanceof ResourceNotFound || error instanceof BadRequest || error instanceof InvalidInput) {
         throw error;
       }
-      throw new Error(`Error rejecting application: ${error.message}`);
+      throw new Error(`Error updating campaign: ${error.message}`);
     }
   }
 
@@ -332,38 +320,39 @@ export class CampaignProvider {
   public async acceptInfluencerForCampaign(
     brandId: string,
     campaignId: string,
-    influencerId: string
+    payload: Partial<ICampaign>
   ): Promise<ServiceResponse<ICampaign>> {
+    const influencerId = payload.influencerId[0];
     try {
-      if (!isValidObjectId(brandId)) throw new BadRequest("Invalid brand ID");
-      if (!isValidObjectId(campaignId))
+      if (!isValidObjectId(brandId.toString()))
+        throw new BadRequest("Invalid brand ID");
+      if (!isValidObjectId(campaignId.toString()))
         throw new BadRequest("Invalid campaign ID");
-      if (!isValidObjectId(influencerId))
-        throw new BadRequest("Invalid influencer ID");
+      if (!isValidObjectId(influencerId.toString()))
+        throw new BadRequest("Invalid infulencer ID");
 
-      const invitation = await Invitation.findOneAndUpdate(
-        {
-          campaignId,
-          influencerId,
-          brandId,
-          status: "pending",
-          sender: influencerId,
-        },
-        { status: "accepted" },
-        { new: true }
-      );
-
-      if (!invitation) {
-        throw new ResourceNotFound(
-          "Pending application/invitation not found for this influencer."
-        );
-      }
+      // console.log(
+      //   typeof influencerId,
+      //   isValidObjectId(influencerId.toString()),
+      //   "acceptInfluencer"
+      // );
 
       const campaign = await Campaign.findOneAndUpdate(
         { _id: campaignId, brandId: brandId },
         {
           $addToSet: {
-            influencerId: new mongoose.Types.ObjectId(influencerId),
+            influencerId: new mongoose.Types.ObjectId(
+              influencerId.toString()
+              // ...payload.influencerId.toString()
+            ),
+          },
+          $pull: {
+            applications: {
+              influencerId: new mongoose.Types.ObjectId(
+                influencerId.toString()
+                // ...payload.influencerId!.toString()
+              ),
+            },
           },
         },
         { new: true }
@@ -379,11 +368,7 @@ export class CampaignProvider {
         data: campaign,
       };
     } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof BadRequest ||
-        error instanceof InvalidInput
-      ) {
+      if (error instanceof ResourceNotFound || error instanceof BadRequest || error instanceof InvalidInput) {
         throw error;
       }
       throw new Error(`Error updating campaign: ${error.message}`);
@@ -426,11 +411,7 @@ export class CampaignProvider {
         data: campaign,
       };
     } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof BadRequest ||
-        error instanceof InvalidInput
-      ) {
+      if (error instanceof ResourceNotFound || error instanceof BadRequest || error instanceof InvalidInput) {
         throw error;
       }
       throw new Error(`Error updating campaign: ${error.message}`);
@@ -477,11 +458,7 @@ export class CampaignProvider {
         data: campaign,
       };
     } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof InvalidInput ||
-        error instanceof BadRequest
-      ) {
+      if (error instanceof ResourceNotFound || error instanceof InvalidInput || error instanceof BadRequest) {
         throw error;
       }
       throw new Error(`Error deleting campaign: ${error.message}`);
@@ -501,11 +478,11 @@ export class CampaignProvider {
     influencerId: string,
     message: string,
     offer: number | string
-  ): Promise<ServiceResponse<IInvitation>> {
+  ): Promise<ServiceResponse<Partial<ICampaign>>> {
     try {
-      if (!isValidObjectId(campaignId))
+      if (!isValidObjectId(campaignId.toString()))
         throw new BadRequest("Invalid campaign ID");
-      if (!isValidObjectId(influencerId))
+      if (!isValidObjectId(influencerId.toString()))
         throw new BadRequest("Invalid influencer ID");
 
       const campaign = await Campaign.findById(campaignId);
@@ -518,142 +495,72 @@ export class CampaignProvider {
         throw new ResourceNotFound("Influencer not found");
       }
 
-      const computedType = this.isFollowerCountValidForType(
-        influencer.followers
-      );
+      const computedType = this.isFollowerCountValidForType(influencer.followers);
 
-      // const allowedTypes = ["Nano", "Micro", "Macro", "Mega"];
-      // if (!allowedTypes.includes(campaign.collaborationPreferences.type)) {
-      //   throw new BadRequest("Campaign has invalid influencer type criteria");
-      // }
-
-      // if (campaign.collaborationPreferences.type !== computedType) {
-      //   throw new BadRequest(
-      //     `This campaign is only open to ${campaign.collaborationPreferences.type} influencers. You are categorized as ${computedType}.`
-      //   );
-      // }
-
-      const existingInvitation = await Invitation.findOne({
-        campaignId,
-        influencerId,
-      });
-      if (existingInvitation) {
-        throw new BadRequest("You have already applied to this campaign.");
+      // Validate campaign expects a valid type
+      const allowedTypes = ['Nano', 'Micro', 'Macro', 'Mega'];
+      if (!allowedTypes.includes(campaign.collaborationPreferences.type)) {
+        throw new BadRequest("Campaign has invalid influencer type criteria");
       }
 
-      const isEnrolled = campaign.influencerId.some(
-        (id) => id.toString() === influencerId
+      // Compare computed type to campaign requirement
+      if (campaign.collaborationPreferences.type !== computedType) {
+        throw new BadRequest(
+          `This campaign is only open to ${campaign.collaborationPreferences.type} influencers. You are categorized as ${computedType}.`
+        );
+      }
+
+
+      const hasApplied = await campaign.applications.some(
+        (application) =>
+          application.influencerId.toString() === influencerId.toString()
       );
+
+      const isEnrolled = await campaign.influencerId.some(
+        (influencer) => influencer.toString() === influencerId.toString()
+      );
+
+      console.log(
+        "applyToCampaign service:",
+        campaign,
+        "\n is enrolled: ",
+        isEnrolled,
+        "hasApplied: ",
+        hasApplied
+      );
+
+      if (hasApplied) {
+        throw new BadRequest("Influencer has already applied to this campaign");
+      }
+
       if (isEnrolled) {
-        throw new BadRequest("You are already enrolled in this campaign.");
+        throw new BadRequest("Influencer is already enrolled to this campaign");
       }
 
-      const newInvitation = new Invitation({
-        campaignId,
-        influencerId,
-        brandId: campaign.brandId,
-        sender: influencerId,
-        receiver: campaign.brandId,
-        message,
-        offer,
-        status: "pending",
-      });
+      const application = {
+        influencerId: new mongoose.Types.ObjectId(influencerId),
+        message: message,
+        offer: offer,
+        appliedAt: new Date(),
+      };
+      console.log("applyToCampaign", application, "message", message);
 
-      await newInvitation.save();
-      console.log("applyToCampaign service: ", newInvitation);
+      const responseResult = await Campaign.findByIdAndUpdate(
+        campaignId,
+        { $push: { applications: application } },
+        { new: true }
+      );
 
       return {
         status_code: 200,
         message: "Application sent successfully",
-        data: newInvitation,
+        data: responseResult,
       };
     } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof InvalidInput ||
-        error instanceof BadRequest
-      ) {
+      if (error instanceof ResourceNotFound || error instanceof InvalidInput || error instanceof BadRequest) {
         throw error;
       }
       throw new Error(`Error sending application: ${error.message}`);
-    }
-  }
-
-  /**
-   * Brand invites an Influencer to a Campaign
-   * @param campaignId The id of the campaign
-   * @param brandId The id of the brand inviting
-   * @param influencerId The id of the influencer being invited
-   * @param message The message sent by the brand
-   */
-  public async inviteToCampaign(
-    campaignId: string,
-    brandId: string,
-    influencerId: string,
-    message?: string
-  ): Promise<ServiceResponse<IInvitation>> {
-    try {
-      if (!isValidObjectId(campaignId))
-        throw new BadRequest("Invalid campaign ID");
-      if (!isValidObjectId(brandId)) throw new BadRequest("Invalid brand ID");
-      if (!isValidObjectId(influencerId))
-        throw new BadRequest("Invalid influencer ID");
-
-      const campaign = await Campaign.findOne({ _id: campaignId, brandId });
-      if (!campaign) {
-        throw new ResourceNotFound("Campaign not found for this brand");
-      }
-
-      const influencer = await Influencer.findById(influencerId);
-      if (!influencer) {
-        throw new ResourceNotFound("Influencer not found");
-      }
-
-      const existingInvitation = await Invitation.findOne({
-        campaignId,
-        influencerId,
-      });
-      if (existingInvitation) {
-        throw new BadRequest(
-          "This influencer has already been invited to or has applied to this campaign."
-        );
-      }
-
-      const isEnrolled = campaign.influencerId.some(
-        (id) => id.toString() === influencerId
-      );
-      if (isEnrolled) {
-        throw new BadRequest(
-          "This influencer is already part of this campaign."
-        );
-      }
-
-      const newInvitation = new Invitation({
-        campaignId,
-        influencerId,
-        brandId,
-        sender: brandId,
-        receiver: influencerId,
-        message,
-        status: "pending",
-      });
-
-      await newInvitation.save();
-
-      return {
-        status_code: 200,
-        message: "Invitation sent successfully",
-        data: newInvitation,
-      };
-    } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof InvalidInput ||
-        error instanceof BadRequest
-      ) {
-        throw error;
-      }
-      throw new Error(`Error sending invitation: ${error.message}`);
     }
   }
 
@@ -667,41 +574,31 @@ export class CampaignProvider {
   public async getCampaignsAppliedByInfluencerForBrand(
     influencerId: string,
     brandId: string
-  ): Promise<ServiceResponse<ICampaign[]>> {
+  ): Promise<ServiceResponse<any>> {
+    // Validate the IDs
     try {
-      if (!isValidObjectId(brandId)) throw new BadRequest("Invalid Brand ID");
+      if (!isValidObjectId(brandId)) throw new BadRequest("Invalid Campaign ID");
       if (!isValidObjectId(influencerId))
         throw new BadRequest("Invalid influencer ID");
 
-      const invitations = await Invitation.find({
-        influencerId,
-        brandId,
-        sender: influencerId,
-      }).select("campaignId");
+      const campaigns = await Campaign.find({
+        brandId: brandId,
+        "applications.influencerId": influencerId,
+      });
 
-      if (!invitations || invitations.length === 0) {
+      if (!campaigns || campaigns.length === 0) {
         throw new ResourceNotFound(
-          "No applications found for this influencer under this brand"
+          "No campaigns found that the influencer applied for under this brand"
         );
       }
 
-      const campaignIds = invitations.map((inv) => inv.campaignId);
-
-      const campaigns = await Campaign.find({
-        _id: { $in: campaignIds },
-      });
-
       return {
         status_code: 200,
-        message: "Campaigns with applications retrieved successfully",
+        message: "Campaigns retrieved successfully",
         data: campaigns,
       };
     } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof InvalidInput ||
-        error instanceof BadRequest
-      ) {
+      if (error instanceof ResourceNotFound || error instanceof InvalidInput || error instanceof BadRequest) {
         throw error;
       }
       throw new Error(`Error retrieving campaigns: ${error.message}`);
@@ -753,11 +650,7 @@ export class CampaignProvider {
         data: recommendedInfluencers,
       };
     } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof InvalidInput ||
-        error instanceof BadRequest
-      ) {
+      if (error instanceof ResourceNotFound || error instanceof InvalidInput || error instanceof BadRequest) {
         throw error;
       }
       throw new Error(`Error retrieving influencers: ${error.message}`);
@@ -799,11 +692,7 @@ export class CampaignProvider {
         data: campaigns,
       };
     } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof InvalidInput ||
-        error instanceof BadRequest
-      ) {
+      if (error instanceof ResourceNotFound || error instanceof InvalidInput || error instanceof BadRequest) {
         throw error;
       }
       throw new Error(`Error retrieving campaigns: ${error.message}`);
@@ -817,37 +706,28 @@ export class CampaignProvider {
 
   public async getCampaignsAppliedByInfluencer(
     influencerId: string
-  ): Promise<ServiceResponse<ICampaign[]>> {
+  ): Promise<ServiceResponse<any>> {
     try {
       if (!isValidObjectId(influencerId))
         throw new BadRequest("Invalid influencer ID");
 
-      const invitations = await Invitation.find({
-        influencerId,
-        sender: influencerId,
-      }).populate<{ campaignId: ICampaign | null }>("campaignId");
+      const campaigns = await Campaign.find({
+        "applications.influencerId": influencerId,
+      });
 
-      if (!invitations || invitations.length === 0) {
+      if (!campaigns || campaigns.length === 0) {
         throw new ResourceNotFound(
           "No campaigns found that the influencer applied for"
         );
       }
 
-      const campaigns = invitations
-        .map((inv) => inv.campaignId)
-        .filter((campaign): campaign is ICampaign => !!campaign);
-
       return {
         status_code: 200,
-        message: "Campaigns with applications retrieved successfully",
+        message: "Campaigns retrieved successfully",
         data: campaigns,
       };
     } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof InvalidInput ||
-        error instanceof BadRequest
-      ) {
+      if (error instanceof ResourceNotFound || error instanceof InvalidInput || error instanceof BadRequest) {
         throw error;
       }
       throw new Error(`Error retrieving campaigns: ${error.message}`);
@@ -868,22 +748,32 @@ export class CampaignProvider {
     campaignId: string,
     message?: string,
     offer?: number | string
-  ): Promise<ServiceResponse<IInvitation>> {
+  ): Promise<ServiceResponse<any>> {
     try {
       if (!isValidObjectId(influencerId))
         throw new BadRequest("Invalid influencer ID");
       if (!isValidObjectId(campaignId))
         throw new BadRequest("Invalid campaign ID");
 
-      const invitation = await Invitation.findOne({
-        influencerId,
-        campaignId,
-        sender: influencerId,
-      });
-      if (!invitation) throw new ResourceNotFound("Application not found");
+      const campaign = await Campaign.findById(campaignId);
+      if (!campaign) throw new ResourceNotFound("Campaign not found");
+
+      const influencer = await Influencer.findById(influencerId);
+      if (!influencer) throw new ResourceNotFound("Influencer not found");
+
+      const applicationIndex = campaign.applications.findIndex(
+        (application) =>
+          application.influencerId.toString() === influencerId.toString()
+      );
+
+      if (applicationIndex === -1) {
+        throw new ResourceNotFound("Application not found");
+      }
+
+      const application = campaign.applications[applicationIndex];
 
       const currentTime = new Date();
-      const applicationTime = new Date(invitation.appliedAt);
+      const applicationTime = new Date(application.appliedAt);
       const hoursSinceApplied =
         (currentTime.getTime() - applicationTime.getTime()) / (1000 * 60 * 60);
 
@@ -892,29 +782,20 @@ export class CampaignProvider {
           "Application can only be edited within 5 hours of applying"
         );
       }
-
-      const updateData: {
-        message?: string;
-        offer?: number | string;
-        [key: string]: any;
-      } = {};
       if (message !== undefined) {
-        updateData.message = message;
+        campaign.applications[applicationIndex].message = message;
       }
       if (offer !== undefined) {
-        updateData.offer = offer;
+        campaign.applications[applicationIndex].offer = offer;
       }
 
-      const updatedInvitation = await Invitation.findByIdAndUpdate(
-        invitation._id,
-        { $set: updateData },
-        { new: true }
-      );
+      campaign.applications[applicationIndex].lastEditedAt = new Date();
+      await campaign.save();
 
       return {
         status_code: 200,
         message: "Application edited successfully",
-        data: updatedInvitation,
+        data: campaign.applications[applicationIndex],
       };
     } catch (error) {
       if (
@@ -937,26 +818,28 @@ export class CampaignProvider {
   public async getInfluencerApplicationInCampaign(
     influencerId: string,
     campaignId: string
-  ): Promise<ServiceResponse<IInvitation>> {
+  ): Promise<ServiceResponse<any>> {
     try {
       if (!isValidObjectId(influencerId))
         throw new BadRequest("Invalid influencer ID");
       if (!isValidObjectId(campaignId))
         throw new BadRequest("Invalid campaign ID");
 
-      const invitation = await Invitation.findOne({
-        influencerId,
-        campaignId,
-        sender: influencerId,
-      });
+      const campaign = await Campaign.findById(campaignId);
 
-      if (!invitation)
+      if (!campaign) throw new ResourceNotFound("Campaign not found");
+
+      const application = campaign.applications.find(
+        (application) => application.influencerId.toString() === influencerId
+      );
+
+      if (!application)
         throw new ResourceNotFound("You have not applied to this campaign");
 
       return {
         status_code: 200,
         message: "Application retrieved successfully",
-        data: invitation,
+        data: application,
       };
     } catch (error) {
       if (
@@ -977,20 +860,37 @@ export class CampaignProvider {
 
   public async getAllInfluencerApplications(
     influencerId: string
-  ): Promise<ServiceResponse<IInvitation[]>> {
+  ): Promise<ServiceResponse<any>> {
     try {
       if (!isValidObjectId(influencerId))
         throw new BadRequest("Invalid influencer ID");
 
-      const applications = await Invitation.find({
-        influencerId,
-        sender: influencerId,
-      }).populate("campaignId");
+      const influencer = await Influencer.findById(influencerId);
+      if (!influencer) throw new ResourceNotFound("Influencer not found");
+
+      const campaigns = await Campaign.find({
+        "applications.influencerId": influencerId,
+      });
+
+      const allApplications = [];
+
+      campaigns.forEach((campaign) => {
+        const applications = campaign.applications.filter(
+          (app) => app.influencerId.toString() === influencerId.toString()
+        );
+
+        applications.forEach((app) => {
+          allApplications.push({
+            campaignId: campaign._id,
+            application: app,
+          });
+        });
+      });
 
       return {
         status_code: 200,
         message: "Applications retrieved successfully",
-        data: applications,
+        data: allApplications,
       };
     } catch (error) {
       if (
@@ -1001,178 +901,6 @@ export class CampaignProvider {
         throw error;
       }
       throw new Error(`Error retrieving applications: ${error.message}`);
-    }
-  }
-
-  /**
-   * Retrieves all invitations received by a specific influencer.
-   * @param influencerId The ID of the influencer.
-   * @param status Optional: Filter invitations by status (e.g., "pending", "accepted", "rejected").
-   */
-  public async getCampaignInvitationsByInfluencer(
-    influencerId: string,
-    status?: "pending" | "accepted" | "rejected"
-  ): Promise<ServiceResponse<IInvitation[]>> {
-    try {
-      if (!isValidObjectId(influencerId)) {
-        throw new BadRequest("Invalid influencer ID");
-      }
-
-      const query: any = { receiver: influencerId };
-      if (status) {
-        query.status = status;
-      }
-
-      const invitations = await Invitation.find(query)
-        .populate({
-          path: "campaignId",
-          select: "title", // Only need the title of the campaign
-        })
-        .populate({
-          path: "brandId", // Populate brandId to get brand name
-          select: "firstName lastName", // Assuming brand name is firstName/lastName
-        })
-        .sort({ createdAt: -1 }); // Sort by most recent
-
-      if (!invitations || invitations.length === 0) {
-        throw new ResourceNotFound("No invitations found for this influencer.");
-      }
-
-      return {
-        status_code: 200,
-        message: "Invitations retrieved successfully",
-        data: invitations,
-      };
-    } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof InvalidInput ||
-        error instanceof BadRequest
-      ) {
-        throw error;
-      }
-      throw new Error(`Error retrieving invitations: ${error.message}`);
-    }
-  }
-
-  /**
-   * Influencer accepts a Campaign Invitation
-   * @param influencerId The id of the influencer accepting
-   * @param campaignId The id of the campaign
-   * @param brandId The id of the brand that sent the invitation
-   */
-  public async acceptCampaignInvitation(
-    influencerId: string,
-    campaignId: string,
-    brandId: string
-  ): Promise<ServiceResponse<IInvitation>> {
-    try {
-      if (!isValidObjectId(influencerId))
-        throw new BadRequest("Invalid influencer ID");
-      if (!isValidObjectId(campaignId))
-        throw new BadRequest("Invalid campaign ID");
-      if (!isValidObjectId(brandId)) throw new BadRequest("Invalid brand ID");
-
-      const invitation = await Invitation.findOneAndUpdate(
-        {
-          campaignId,
-          influencerId,
-          brandId,
-          status: "pending",
-          receiver: influencerId, // Ensure the influencer is the receiver
-        },
-        { status: "accepted" },
-        { new: true }
-      );
-
-      if (!invitation) {
-        throw new ResourceNotFound(
-          "Pending invitation not found for this influencer."
-        );
-      }
-
-      // Add influencer to the campaign's registered influencers
-      const campaign = await Campaign.findOneAndUpdate(
-        { _id: campaignId, brandId: brandId },
-        {
-          $addToSet: {
-            influencerId: new mongoose.Types.ObjectId(influencerId),
-          },
-        },
-        { new: true }
-      ).populate("brandId influencerId");
-
-      if (!campaign) {
-        throw new ResourceNotFound("Campaign not found for this brand");
-      }
-
-      return {
-        status_code: 200,
-        message: "Invitation accepted and influencer registered to campaign",
-        data: invitation,
-      };
-    } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof BadRequest ||
-        error instanceof InvalidInput
-      ) {
-        throw error;
-      }
-      throw new Error(`Error accepting invitation: ${error.message}`);
-    }
-  }
-
-  /**
-   * Influencer declines a Campaign Invitation
-   * @param influencerId The id of the influencer declining
-   * @param campaignId The id of the campaign
-   * @param brandId The id of the brand that sent the invitation
-   */
-  public async rejectCampaignInvitation(
-    influencerId: string,
-    campaignId: string,
-    brandId: string
-  ): Promise<ServiceResponse<IInvitation>> {
-    try {
-      if (!isValidObjectId(influencerId))
-        throw new BadRequest("Invalid influencer ID");
-      if (!isValidObjectId(campaignId))
-        throw new BadRequest("Invalid campaign ID");
-      if (!isValidObjectId(brandId)) throw new BadRequest("Invalid brand ID");
-
-      const invitation = await Invitation.findOneAndUpdate(
-        {
-          campaignId,
-          influencerId,
-          brandId,
-          status: "pending",
-          receiver: influencerId, // Ensure the influencer is the receiver
-        },
-        { status: "rejected" },
-        { new: true }
-      );
-
-      if (!invitation) {
-        throw new ResourceNotFound(
-          "Pending invitation not found for this influencer."
-        );
-      }
-
-      return {
-        status_code: 200,
-        message: "Invitation declined successfully",
-        data: invitation,
-      };
-    } catch (error) {
-      if (
-        error instanceof ResourceNotFound ||
-        error instanceof BadRequest ||
-        error instanceof InvalidInput
-      ) {
-        throw error;
-      }
-      throw new Error(`Error declining invitation: ${error.message}`);
     }
   }
 }

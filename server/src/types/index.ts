@@ -122,27 +122,15 @@ export interface ICampaign {
 }
 
 export interface IApplication {
-    influencerId: mongoose.Types.ObjectId;
-    message?: string;
-    offer?: string | number;
-    appliedAt?: Date;
-    lastEditedAt?: Date;
-}
-
-export interface IInvitation extends Document {
-    campaignId: mongoose.Types.ObjectId;
-    influencerId: mongoose.Types.ObjectId;
-    brandId: mongoose.Types.ObjectId;
-    sender: mongoose.Types.ObjectId;
-    receiver: mongoose.Types.ObjectId;
-    offer?: any; // Changed to any to match Schema.Types.Mixed
-    appliedAt?: Date;
-    status: "pending" | "accepted" | "rejected";
-    message?: string;
+	influencerId: mongoose.Types.ObjectId;
+	message?: string;
+	offer?: string | number;
+	appliedAt?: Date;
+	lastEditedAt?: Date;
 }
 
 export interface IRecommendedInfluencer {
-    influencer: IInfluencer;
+	influencer: IInfluencer;
 	recommendationScore?: number;
 	note?: string;
 	[key: string]: any;
@@ -530,6 +518,7 @@ export interface IYoutubeMetrics {
 }
 
 export interface IFacebookMetrics {
+
     // influencerId: mongoose.Types.ObjectId;
     influencerId: string;
 
@@ -550,6 +539,27 @@ export interface IFacebookMetrics {
     tokenExpiry: Date;
     connected: boolean;
     lastConnected: Date;
+
+  
+	influencerId: string;
+
+	metrics: {
+		followers: number;
+		impressions: number;
+		engagementRate: number;
+		likes: number;
+		views: number;
+		comments: number;
+		shares: number;
+		reach: number;
+		lastUpdated: Date;
+	};
+
+	accessToken: string;
+	refreshToken?: string;
+	tokenExpiry: Date;
+	connected: boolean;
+	lastConnected: Date;
 	facebookId?: string;
 
 	demographics?: {

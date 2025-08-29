@@ -13,9 +13,8 @@ export class ChatService {
    * @returns A promise that resolves with the created chat room
    */
   public async createChatRoom(
-    // participants: Schema.Types.ObjectId[]
-    participants: Types.ObjectId[]
-
+    // participants: IUser[]
+    participants: Schema.Types.ObjectId[]
   ): Promise<ServiceResponse<IChat>> {
     try {
       if (!participants || participants.length === 0) {
