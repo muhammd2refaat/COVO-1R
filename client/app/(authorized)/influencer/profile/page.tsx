@@ -16,6 +16,9 @@ import ShadcnTitle from "@/components/shared/page-title/PageTitle.component";
 import { useRouter } from "next/navigation";
 import ProfileCampaignSection from "@/components/shared/campaign-section/ProfileCampaignSection.component";
 
+import ViewInvitationsDialog from "@/components/authorized/influencer/profile/invitations/ViewInvitationsDialog.component";
+
+
 // Function to calculate age from year of birth
 const calculateAge = (yearOfBirth: string): number | null => {
   if (!yearOfBirth) return null;
@@ -58,6 +61,10 @@ export default function ProfilePage() {
       }
     };
 
+
+    if (token && influencerId) {
+      fetchData(token, influencerId);
+
     async function fetchData(token) {
       if (token) {
         setIsLoading(true); // Set loading to true before fetching
@@ -84,6 +91,7 @@ export default function ProfilePage() {
           setIsLoading(false);
         }
       }
+
     }
     fetchData(token); // Fetch based on current page
     check(profile.profilePicture);

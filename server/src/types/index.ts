@@ -518,6 +518,29 @@ export interface IYoutubeMetrics {
 }
 
 export interface IFacebookMetrics {
+
+    // influencerId: mongoose.Types.ObjectId;
+    influencerId: string;
+
+    metrics: {
+        followers: number;
+        impressions: number;
+        engagementRate: number;
+        likes: number;
+        views: number;
+        comments: number;
+        shares: number;
+        reach: number;
+        lastUpdated: Date;
+    };
+
+    accessToken: string;
+    refreshToken?: string;
+    tokenExpiry: Date;
+    connected: boolean;
+    lastConnected: Date;
+
+  
 	influencerId: string;
 
 	metrics: {
