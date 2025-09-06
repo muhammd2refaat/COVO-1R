@@ -32,6 +32,7 @@ import subscriptionService from "./services/subscription.service";
 import { checkExpiredSubscriptions } from "./utils/subscription.utils";
 import { paymentRouter } from "./routes/payment.routes";
 import { clickLogRouter } from "./routes/clickLog.routes";
+import { getMainDBConnection, getMetricsDBConnection } from "./config/database";
 
 // Security imports
 import { 
@@ -43,8 +44,6 @@ import {
   corsConfig 
 } from "./middleware/security";
 import { secureLog } from "./utils/secureLogger";
-
-import "./cron/scheduler.cron"
 
 dotenv.config();
 
@@ -196,13 +195,62 @@ app.use("/api/payment", paymentRouter);
 app.use("/api", clickLogRouter);
 
 // Health check endpoint
-app.get("/health", (req: Request, res: Response) => {
+app.get("/api/health", (req: Request, res: Response) => {
+  const mainDB = getMainDBConnection();
+  const metricsDB = getMetricsDBConnection();
+  
+  const statusMap = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting'
+  };
+  
   res.status(200).json({
     status: "healthy",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
     environment: config.NODE_ENV,
+    databases: {
+      main: {
+        status: mainDB ? statusMap[mainDB.readyState as keyof typeof statusMap] : 'not initialized',
+        readyState: mainDB?.readyState || 0
+      },
+      metrics: {
+        status: metricsDB ? statusMap[metricsDB.readyState as keyof typeof statusMap] : 'not initialized',
+        readyState: metricsDB?.readyState || 0
+      }
+    }
+  });
+});
+
+// Database status endpoint
+app.get("/api/db-status", (req: Request, res: Response) => {
+  const mainDB = getMainDBConnection();
+  const metricsDB = getMetricsDBConnection();
+  
+  const statusMap = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting'
+  };
+
+  res.json({
+    mainDatabase: {
+      status: mainDB ? statusMap[mainDB.readyState as keyof typeof statusMap] : 'not initialized',
+      readyState: mainDB?.readyState || 0,
+      host: mainDB?.host,
+      name: mainDB?.name
+    },
+    metricsDatabase: {
+      status: metricsDB ? statusMap[metricsDB.readyState as keyof typeof statusMap] : 'not initialized',
+      readyState: metricsDB?.readyState || 0,
+      host: metricsDB?.host,
+      name: metricsDB?.name
+    },
+    timestamp: new Date().toISOString()
   });
 });
 

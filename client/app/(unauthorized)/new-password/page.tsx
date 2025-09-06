@@ -1,15 +1,17 @@
 "use client";
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { resetPasswordRoute } from '@/lib/api/reset-password/resetPassword.route';
 import { resetPasswordSchema, passwordSchema, confirmPasswordSchema } from '@/lib/api/reset-password/resetPassword.validation';
 import { ZodError } from 'zod';
-import COVO_LOGOGRAM_BLACK from "@/assets/images/COVO_LOGOGRAM_BLACK.png";
 
-export default function ResetPasswordPage() {
+// This page uses URL search params and server actions, so it should be dynamic
+export const dynamic = 'force-dynamic';
+
+function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const [token, setToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -26,8 +28,6 @@ export default function ResetPasswordPage() {
     const tokenParam = searchParams.get('token');
     const idParam = searchParams.get('id');
     
-    console.log("URL Parameters:", { token: tokenParam ? `${tokenParam.substring(0, 10)}...` : 'missing', id: idParam });
-    
     if (!tokenParam || !idParam) {
       setTokenIsValid(false);
       setError("Invalid or missing reset token. Please request a new password reset link.");
@@ -36,7 +36,6 @@ export default function ResetPasswordPage() {
     
     setToken(tokenParam);
     setUserId(idParam);
-    console.log("Token and ID set successfully");
   }, [searchParams]);
 
   const validateField = (field: string, value: string) => {
@@ -126,15 +125,11 @@ export default function ResetPasswordPage() {
     setIsSubmitting(true);
     
     try {
-      console.log("Reset attempt with token:", token ? `${token.substring(0, 10)}...` : 'missing');
-      
       const response = await resetPasswordRoute({
         token,
         newPassword,
         confirmPassword
       });
-      
-      console.log("Reset response received:", response);
 
       if (response.status === "success") {
         setSuccess(response.message);
@@ -159,7 +154,7 @@ export default function ResetPasswordPage() {
         {/* Logo Side */}
         <div className="flex items-center justify-center w-[390px]">
           <div className='w-[300px] h-[120px] md:w-[400px] md:h-[400px] flex items-center justify-center'>
-            <Image src={COVO_LOGOGRAM_BLACK} alt="Logo" width={300} height={300} />
+            <Image src="/assets/images/COVO_LOGOGRAM_BLACK.png" alt="Logo" width={300} height={300} />
           </div>
         </div>
         
@@ -260,5 +255,26 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <main className="h-[calc(100dvh-100px)] flex items-center justify-center p-6 relative overflow-hidden bg-custom-very-soft-blue bg-[url('/svg/BG.svg')] bg-no-repeat bg-cover">
+      <div className='bg-custom-light-grayish-blue bg-[url("/svg/BG.svg")] p-10 rounded-lg shadow-md z-40 flex flex-col items-center justify-center h-auto md:flex-row md:w-auto w-[97%]'>
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-custom-dark-desaturated-blue"></div>
+          <span className="ml-2 text-custom-dark-desaturated-blue">Loading...</span>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

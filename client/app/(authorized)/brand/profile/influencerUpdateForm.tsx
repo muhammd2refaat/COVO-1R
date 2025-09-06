@@ -9,10 +9,14 @@ import { z } from "zod";
 import { brandUpdateDataRoute } from "@/lib/api/update-data/brand/brandUpdateData.route";
 import { brandFormDataSchema } from "@/lib/api/update-data/brand/brandUpdateData.validation";
 import { useRouter } from "next/navigation";
-import undraw_fill_forms_npwp from "@/assets/svg/undraw_fill-forms_npwp.svg";
+// import undraw_fill_forms_npwp from "@/assets/svg/undraw_fill-forms_npwp.svg";
 import getCurrentUserData from "@/utils/getCurrentUserData";
-import { countries } from "@/app/(authorized)/brand/moreInfo/CountryDialCodes.json";
+import countryData from "@/app/(authorized)/brand/moreInfo/CountryDialCodes.json";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { sanitizeFormData } from "@/utils/inputSanitizer";
+import { logger, logUserAction } from "@/utils/secureLogger";
+
+const countries = countryData.countries;
 
 type Inputs = z.infer<typeof brandFormDataSchema>;
 
@@ -125,49 +129,70 @@ export default function BrandRegistration() {
       const userId = session?.user?._id;
 
       if (!token) {
-        throw new Error("Failed to retrieve access token from session.");
+        logger.error('Authentication token missing');
+        throw new Error("Authentication required. Please log in again.");
       }
 
       if (!userId) {
-        throw new Error("Failed to retrieve user ID from session.");
+        logger.error('User ID missing from session');
+        throw new Error("User identification required. Please log in again.");
       }
 
+      // Sanitize form data to prevent XSS and other attacks
+      const sanitizedData = sanitizeFormData(formData);
+      
+      logUserAction('BRAND_UPDATE_ATTEMPT', { 
+        userId,
+        fieldsUpdated: Object.keys(sanitizedData)
+      });
+
       // Combine the selected country's dial code with the phone number
-      const fullPhoneNumber = `${selectedCountry.dialCode}${formData.phoneNumber}`;
+      const fullPhoneNumber = `${selectedCountry.dialCode}${sanitizedData.phoneNumber}`;
 
       const updatedFormData = {
-        ...formData,
-        phoneNumber: fullPhoneNumber, // Replace phoneNumber with fullPhoneNumber
+        ...sanitizedData,
+        phoneNumber: fullPhoneNumber,
       };
 
       const result = await brandUpdateDataRoute(updatedFormData, token, userId);
 
-      console.log("==============update==============");
-      console.log("result: ", result);
-      console.log("==============update==============");
-
-      await update(
-        {
+      logger.debug('Brand update response received', {
+        status: response.status,
+        hasData: !!response.data
+      });      if (result.status === "error") {
+        logUserAction('BRAND_UPDATE_FAILED', { 
+          userId,
+          error: result.message 
+        });
+        setError(result.message);
+      } else {
+        logUserAction('BRAND_UPDATE_SUCCESS', { userId });
+        
+        // Update session with new data
+        await update({
           ...session,
           user: {
             ...session.user,
             ...result.data.data,
           },
-        }
-      );
+        });
 
-      if (result.status === "error") {
-        setError(result.message);
-      } else {
         setSuccessMessage("Profile updated successfully!");
 
         setTimeout(() => {
           router.push("/brand/profile");
         }, 1500);
       }
-    } catch (err) {
-      setError(err.message || "An unexpected error occurred.");
-      console.error("Error updating brand data:", err);
+    } catch (err: any) {
+      const errorMessage = err.message || "An unexpected error occurred.";
+      setError(errorMessage);
+      
+      logger.error('Brand update error', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });      logUserAction('BRAND_UPDATE_ERROR', {
+        userId: session?.user?._id,
+        error: errorMessage
+      });
     }
   };
 
@@ -207,13 +232,16 @@ export default function BrandRegistration() {
 
       <div className='bg-[url("/svg/BG.svg")] flex-col flex md:p-[100px] p-[20px] justify-center items-center w-full h-full'>
         <div className="flex justify-center items-center w-full">
-          <Image
+          {/* <Image
             src={undraw_fill_forms_npwp}
             alt="Registration form illustration"
             width={200}
             height={200}
             className="w-[300px] h-auto bg-black/20 p-[20px] rounded-md"
-          />
+          /> */}
+          <div className="w-[300px] h-[200px] bg-black/20 p-[20px] rounded-md flex items-center justify-center">
+            <span className="text-white">Form Illustration</span>
+          </div>
         </div>
         <br />
         {/* Form Steps Navigation */}

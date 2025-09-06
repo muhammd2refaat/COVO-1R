@@ -1,21 +1,60 @@
 import dotenv from "dotenv";
-import mongoose from "mongoose";
 import { config } from "./config/configuration";
 import { createServer } from "http";
 import app from "./app";
 import { startWebSocketServer } from "./socketServer";
 import { chatController } from "./routes/chat.routes";
+import { initializeDatabases } from "./config/database";
+import { enableCronJobs } from "./cron/scheduler.cron";
+
+// Import scheduler after other imports
+import "./cron/scheduler.cron";
 
 dotenv.config();
 
 const PORT = config.port;
-const MAIN_DB_URI = config.MAIN_DB_URI;
-const METRICS_DB_URI = config.METRICS_DB_URI;
-
-const metricsDB = mongoose.createConnection(METRICS_DB_URI);
 
 const server = createServer(app);
 const { io: ioObject, connectedClients, chatRooms } = startWebSocketServer();
+
+// Prevent multiple server startups
+let serverStarted = false;
+
+// Initialize databases and start server
+const startServer = async () => {
+  if (serverStarted) {
+    console.log("Server already started, skipping...");
+    return;
+  }
+  
+  try {
+    serverStarted = true;
+    
+    // Initialize all database connections
+    await initializeDatabases();
+    
+    // Enable cron jobs after database is ready
+    enableCronJobs();
+    
+    // Start the server
+    server.listen(PORT, () => {
+      if (ioObject && chatController) {
+        chatController.setSocketIO(ioObject, connectedClients, chatRooms);
+        console.log("Socket.IO instance injected into ChatController.");
+      } else {
+        console.error("Failed to inject Socket.IO instance.");
+      }
+
+      console.log(`Server started on port ${PORT} 🚀`);
+    });
+  } catch (error) {
+    serverStarted = false; // Reset flag on error
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 // const wss = new WebSocketServer({ server });
 // const chatService = new ChatService();
@@ -435,34 +474,7 @@ const { io: ioObject, connectedClients, chatRooms } = startWebSocketServer();
 //   });
 // });
 
+startServer();
 
-metricsDB.on("error", (err) => {
-	console.error("Metrics database connection error:", err);
-	process.exit(1);
-});
-metricsDB.once("open", () => {
-	console.log("Connected to metrics database 🚀");
-});
-
-
-mongoose
-	.connect(MAIN_DB_URI)
-	.then(() => {
-		console.log("Connected to Main Database 🚀");
-		server.listen(PORT, () => {
-			if (ioObject && chatController) {
-				chatController.setSocketIO(ioObject, connectedClients, chatRooms);
-				console.log("Socket.IO instance injected into ChatController.");
-			} else {
-				console.error("Failed to inject Socket.IO instance.");
-			}
-
-			console.log(`Server started on port ${PORT} 🚀`);
-		});
-	})
-	.catch((err) => {
-		console.error("Database connection error:", err);
-		process.exit(1);
-	});
-
-export { metricsDB };
+// Export metrics DB connection for backward compatibility
+export { getMetricsDBConnection as metricsDB } from "./config/database";
