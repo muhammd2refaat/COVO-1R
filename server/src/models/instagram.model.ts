@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 import { IInstagramMetrics } from "../types";
+import { metricsDB } from "../index";
 
 const InstagramMetricsSchema: Schema = new Schema(
     {
@@ -109,4 +110,4 @@ const InstagramMetricsSchema: Schema = new Schema(
     { timestamps: true }
 );
 
-export const Instagram = mongoose.connection.useDb('metrics').model<IInstagramMetrics>("Instagram", InstagramMetricsSchema);
+export const Instagram = metricsDB?.model<IInstagramMetrics>("Instagram", InstagramMetricsSchema) || mongoose.model<IInstagramMetrics>("Instagram", InstagramMetricsSchema);

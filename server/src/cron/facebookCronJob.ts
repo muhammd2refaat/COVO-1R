@@ -7,12 +7,11 @@ import {
 import { updateFacebookMetrics } from "../services/facebook/facebookPlaformData.service";
 import { isTokenExpired, isTokenExpiringSoon } from "../middleware/helper"
 import mongoose from "mongoose";
-import { config } from "../config/configuration";
 import { NotificationCategory, NotificationStatus, UserRole } from "../types/enum";
 
 async function runFacebookCronJob() {
     try {
-        await mongoose.connect(config.METRICS_DB_URI);
+        // Use existing connection instead of creating a new one
 
         const facebookUsers = await Facebook.find({ connected: true });
 
@@ -68,9 +67,8 @@ async function runFacebookCronJob() {
         console.log("✅ Facebook cron job completed.");
     } catch (err) {
         console.error("❌ Cron job failed:", err.message);
-    } finally {
-        await mongoose.disconnect();
     }
+    // No longer disconnecting - use existing connection
 }
 
 export default runFacebookCronJob;

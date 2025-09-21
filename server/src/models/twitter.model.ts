@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 import { ITwitterMetrics } from "../types";
+import { metricsDB } from "../index";
 
 const TwitterMetricsSchema: Schema = new Schema(
     {
@@ -76,4 +77,4 @@ const TwitterMetricsSchema: Schema = new Schema(
     { timestamps: true }
 );
 
-export const Twitter = mongoose.connection.useDb('metrics').model<ITwitterMetrics>("Twitter", TwitterMetricsSchema);
+export const Twitter = metricsDB?.model<ITwitterMetrics>("Twitter", TwitterMetricsSchema) || mongoose.model<ITwitterMetrics>("Twitter", TwitterMetricsSchema);

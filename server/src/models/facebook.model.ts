@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 import { IFacebookMetrics } from "../types";
+import { metricsDB } from "../index";
 
 const FacebookMetricsSchema: Schema = new Schema(
     {
@@ -88,4 +89,6 @@ const FacebookMetricsSchema: Schema = new Schema(
     { timestamps: true }
 );
 
-export const Facebook = mongoose.connection.useDb('metrics').model<IFacebookMetrics>("Facebook", FacebookMetricsSchema);
+// Use the dedicated metrics connection instead of main connection
+// This ensures we're using the correct database connection for metrics
+export const Facebook = metricsDB?.model<IFacebookMetrics>("Facebook", FacebookMetricsSchema) || mongoose.model<IFacebookMetrics>("Facebook", FacebookMetricsSchema);

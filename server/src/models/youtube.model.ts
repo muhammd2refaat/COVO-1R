@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 import { IYoutubeMetrics } from "../types";
+import { metricsDB } from "../index";
 
 const YoutubeMetricsSchema: Schema = new Schema(
     {
@@ -98,4 +99,4 @@ const YoutubeMetricsSchema: Schema = new Schema(
     { timestamps: true }
 );
 
-export const Youtube = mongoose.connection.useDb('metrics').model<IYoutubeMetrics>("Youtube", YoutubeMetricsSchema);
+export const Youtube = metricsDB?.model<IYoutubeMetrics>("Youtube", YoutubeMetricsSchema) || mongoose.model<IYoutubeMetrics>("Youtube", YoutubeMetricsSchema);
