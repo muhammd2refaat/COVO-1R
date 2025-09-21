@@ -12,7 +12,7 @@ const PORT = config.port;
 const MAIN_DB_URI = config.MAIN_DB_URI;
 const METRICS_DB_URI = config.METRICS_DB_URI;
 
-// MongoDB connection options
+// MongoDB connection options - FIXED: removed unsupported option
 const mongoOptions = {
   serverSelectionTimeoutMS: 30000, // 30 seconds
   socketTimeoutMS: 45000, // 45 seconds
@@ -28,6 +28,65 @@ const metricsDB = mongoose.createConnection(METRICS_DB_URI, mongoOptions);
 
 const server = createServer(app);
 const { io: ioObject, connectedClients, chatRooms } = startWebSocketServer();
+
+metricsDB.on("error", (err) => {
+	console.error("Metrics database connection error:", err);
+});
+
+metricsDB.on("disconnected", () => {
+	console.log("Metrics database disconnected");
+});
+
+metricsDB.on("reconnected", () => {
+	console.log("Metrics database reconnected");
+});
+
+metricsDB.once("open", () => {
+	console.log("Connected to metrics database 🚀");
+});
+
+// Add connection event handlers for main database
+mongoose.connection.on("error", (err) => {
+	console.error("Main database connection error:", err);
+});
+
+mongoose.connection.on("disconnected", () => {
+	console.log("Main database disconnected");
+});
+
+mongoose.connection.on("reconnected", () => {
+	console.log("Main database reconnected");
+});
+
+mongoose.connection.on("connecting", () => {
+	console.log("Connecting to main database...");
+});
+
+mongoose.connection.on("connected", () => {
+	console.log("Main database connection established");
+});
+
+mongoose
+	.connect(MAIN_DB_URI, mongoOptions)
+	.then(() => {
+		console.log("Connected to Main Database 🚀");
+		server.listen(PORT, () => {
+			if (ioObject && chatController) {
+				chatController.setSocketIO(ioObject, connectedClients, chatRooms);
+				console.log("Socket.IO instance injected into ChatController.");
+			} else {
+				console.error("Failed to inject Socket.IO instance.");
+			}
+
+			console.log(`Server started on port ${PORT} 🚀`);
+		});
+	})
+	.catch((err) => {
+		console.error("Database connection error:", err);
+		process.exit(1);
+	});
+
+export { metricsDB };
 
 // const wss = new WebSocketServer({ server });
 // const chatService = new ChatService();
@@ -445,65 +504,5 @@ const { io: ioObject, connectedClients, chatRooms } = startWebSocketServer();
 //       });
 //     }
 //   });
+// The rest of the commented WebSocket code...
 // });
-
-
-metricsDB.on("error", (err) => {
-	console.error("Metrics database connection error:", err);
-});
-
-metricsDB.on("disconnected", () => {
-	console.log("Metrics database disconnected");
-});
-
-metricsDB.on("reconnected", () => {
-	console.log("Metrics database reconnected");
-});
-
-metricsDB.once("open", () => {
-	console.log("Connected to metrics database 🚀");
-});
-
-// Add connection event handlers for main database
-mongoose.connection.on("error", (err) => {
-	console.error("Main database connection error:", err);
-});
-
-mongoose.connection.on("disconnected", () => {
-	console.log("Main database disconnected");
-});
-
-mongoose.connection.on("reconnected", () => {
-	console.log("Main database reconnected");
-});
-
-mongoose.connection.on("connecting", () => {
-	console.log("Connecting to main database...");
-});
-
-mongoose.connection.on("connected", () => {
-	console.log("Main database connection established");
-});
-
-
-mongoose
-	.connect(MAIN_DB_URI, mongoOptions)
-	.then(() => {
-		console.log("Connected to Main Database 🚀");
-		server.listen(PORT, () => {
-			if (ioObject && chatController) {
-				chatController.setSocketIO(ioObject, connectedClients, chatRooms);
-				console.log("Socket.IO instance injected into ChatController.");
-			} else {
-				console.error("Failed to inject Socket.IO instance.");
-			}
-
-			console.log(`Server started on port ${PORT} 🚀`);
-		});
-	})
-	.catch((err) => {
-		console.error("Database connection error:", err);
-		process.exit(1);
-	});
-
-export { metricsDB };

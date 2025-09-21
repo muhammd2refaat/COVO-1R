@@ -54,9 +54,17 @@ const endpoints = {
   // deactivate account
   deactivateAccount: "/deactivate/:userId",
 };
+
 type TEndpoints = keyof typeof endpoints;
+
+// Check if we're on the server side or client side
+const isServerSide = typeof window === 'undefined';
+const baseUrl = isServerSide 
+  ? (process.env.SERVER_URL + "/api") 
+  : (process.env.NEXT_PUBLIC_API_URL || "/api");
+
 for (const key in endpoints) {
-  endpoints[key as TEndpoints] =
-    process.env.SERVER_URL + "/api" + endpoints[key as TEndpoints];
+  endpoints[key as TEndpoints] = baseUrl + endpoints[key as TEndpoints];
 }
+
 export default endpoints;

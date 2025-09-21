@@ -8,6 +8,7 @@ import {
   AuthServiceResponse,
 } from "../types";
 import { asyncHandler } from "../middleware/helper";
+import { securityMonitor } from "../middleware/securityMonitor";
 
 const authProvider = new AuthProvider();
 
@@ -80,9 +81,30 @@ export class AuthController {
     try {
       const response: AuthServiceResponse<Partial<IUser>> =
         await authProvider.login(email, password);
+      
+      // Track login attempt
+      if (response.status_code === 200 && response.data && !Array.isArray(response.data) && (response.data as any).id) {
+        // Successful login
+        securityMonitor.trackSuccessfulLogin(req, (response.data as any).id.toString());
+      } else {
+        // Failed login
+        securityMonitor.trackFailedLogin(req, {
+          email: email,
+          reason: response.message || 'Invalid credentials'
+        });
+      }
+      
       return res.status(response.status_code).json(response);
     } catch (error) {
       console.log(`Error: ${error.message}`);
+      
+      // Track failed login on exception
+      securityMonitor.trackFailedLogin(req, {
+        email: email,
+        reason: 'Authentication error',
+        error: error.message
+      });
+      
       return res
         .status(error.status_code || 500)
         .json({ message: error.message || "Internal Server Error" });

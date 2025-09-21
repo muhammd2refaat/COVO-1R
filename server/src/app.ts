@@ -42,6 +42,7 @@ import {
   requestTimeout,
   corsConfig 
 } from "./middleware/security";
+import { securityMonitor } from "./middleware/securityMonitor";
 import { secureLog } from "./utils/secureLogger";
 
 import "./cron/scheduler.cron"
@@ -161,6 +162,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// Security monitoring middleware
+app.use(securityMonitor.middleware());
+
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -202,6 +206,17 @@ app.get("/health", (req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
+    environment: config.NODE_ENV,
+  });
+});
+
+// API Health check endpoint
+app.get("/api/health", (req: Request, res: Response) => {
+  res.status(200).json({
+    status: "healthy",
+    service: "covo-api",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
     environment: config.NODE_ENV,
   });
 });
